@@ -164,6 +164,13 @@ public class InventoryManager : MonoBehaviour
         }
     }
 
+    private void SaveUserGameInfo()
+    {
+        // GameManager의 데이터를 데이터베이스에 저장
+        GameManager.Instance.SaveUserData();
+        GameManager.Instance.SaveUserInventory();
+    }
+
     void PopulateMarketInventory()
     {
         Debug.Log("Populating Market Inventory");
@@ -240,6 +247,8 @@ public class InventoryManager : MonoBehaviour
                         {
                             Debug.Log("Item successfully registered.");
                             userItems.Remove(selectedItem); // 사용자의 인벤토리에서 아이템 제거
+                            GameManager.Instance.Inventory = userItems; // GameManager의 인벤토리 업데이트
+                            SaveUserGameInfo(); // 데이터베이스에 저장
                             LoadUserInventory(); // 사용자 인벤토리 UI 업데이트
                             itemDetailPanel.SetActive(false);
                             LoadMarketItems(); // MarketItems 재로드하여 업데이트된 데이터 반영
@@ -359,11 +368,12 @@ public class InventoryManager : MonoBehaviour
                         {
                             totalGold = Convert.ToInt32(result["newGold"]);
                             UpdateTotalGoldText();
+                            GameManager.Instance.Gold = totalGold; // GameManager의 골드 업데이트
                         }
 
                         Debug.Log("Item successfully purchased.");
-                        LoadUserInventory(); // 아이템 구매 후 유저 인벤토리 다시 로드
-                        LoadMarketItems(); // 아이템 구매 후 마켓 인벤토리 다시 로드
+                        GameManager.Instance.LoadUserData(); // 유저 데이터 다시 로드
+                        SaveUserGameInfo(); // 데이터베이스에 저장
                     }
                     else
                     {
@@ -376,6 +386,7 @@ public class InventoryManager : MonoBehaviour
                 }
             });
     }
+
 
     void UpdateTotalGoldText()
     {
