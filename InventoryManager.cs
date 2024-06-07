@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Firebase;
 using Firebase.Auth;
@@ -33,7 +34,6 @@ public class InventoryManager : MonoBehaviour
 
     void Start()
     {
-        Debug.Log("Start method called.");
         registerButton.onClick.AddListener(RegisterItem);
         closeButton.onClick.AddListener(CloseItemDetailPanel);
         refreshButton.onClick.AddListener(LoadMarketItems);
@@ -45,10 +45,8 @@ public class InventoryManager : MonoBehaviour
     {
         FirebaseApp.CheckAndFixDependenciesAsync().ContinueWithOnMainThread(task =>
         {
-            Debug.Log("Checking Firebase dependencies.");
             if (task.Result == DependencyStatus.Available)
             {
-                Debug.Log("Firebase dependencies are available.");
                 FirebaseAuth.DefaultInstance.StateChanged += HandleAuthStateChanged;
                 FirebaseFirestore db = FirebaseFirestore.DefaultInstance; // Firestore 초기화
 
@@ -73,7 +71,6 @@ public class InventoryManager : MonoBehaviour
 
     private void HandleAuthStateChanged(object sender, EventArgs e)
     {
-        Debug.Log("Auth state changed.");
         if (FirebaseAuth.DefaultInstance.CurrentUser != null)
         {
             Debug.Log("User is logged in.");
@@ -173,7 +170,6 @@ public class InventoryManager : MonoBehaviour
 
     void PopulateMarketInventory()
     {
-        Debug.Log("Populating Market Inventory");
         foreach (Transform child in marketInventoryPanel.transform)
         {
             Destroy(child.gameObject);
@@ -213,7 +209,6 @@ public class InventoryManager : MonoBehaviour
         itemAttackText.text = $"Attack: {item.attack}";
         itemSpeedText.text = $"Speed: {item.speed}";
         itemDefenseText.text = $"Defense: {item.defense}";
-        Debug.Log($"Item detail panel opened for {item.itemName}");
     }
 
     void RegisterItem()
@@ -247,9 +242,9 @@ public class InventoryManager : MonoBehaviour
                         {
                             Debug.Log("Item successfully registered.");
                             userItems.Remove(selectedItem); // 사용자의 인벤토리에서 아이템 제거
-                            GameManager.Instance.Inventory = userItems; // GameManager의 인벤토리 업데이트
+                            GameManager.Instance.Inventory = new List<ItemData>(userItems); // GameManager의 인벤토리 업데이트
                             SaveUserGameInfo(); // 데이터베이스에 저장
-                            LoadUserInventory(); // 사용자 인벤토리 UI 업데이트
+                            StartCoroutine(RefreshUserInventory()); // 사용자 인벤토리 UI 업데이트
                             itemDetailPanel.SetActive(false);
                             LoadMarketItems(); // MarketItems 재로드하여 업데이트된 데이터 반영
                         }
@@ -270,10 +265,16 @@ public class InventoryManager : MonoBehaviour
         }
     }
 
+    private IEnumerator RefreshUserInventory()
+    {
+        // 잠시 대기 후 유저 인벤토리를 다시 로드하여 UI를 업데이트
+        yield return new WaitForSeconds(0.5f);
+        LoadUserInventory();
+    }
+
     void CloseItemDetailPanel()
     {
         itemDetailPanel.SetActive(false);
-        Debug.Log("Item detail panel closed");
     }
 
     void LoadMarketItems()
@@ -303,7 +304,7 @@ public class InventoryManager : MonoBehaviour
                         Debug.LogError("Snapshot is null.");
                         return;
                     }
-                    
+
                     marketItems.Clear();
                     foreach (var document in snapshot.Documents)
                     {
@@ -363,17 +364,29 @@ public class InventoryManager : MonoBehaviour
                 {
                     if (task.Exception == null)
                     {
-                        var result = (IDictionary<string, object>)task.Result.Data;
-                        if (result != null && result.ContainsKey("newGold"))
+                        var json = task.Result.Data as string;
+                        if (!string.IsNullOrEmpty(json))
                         {
-                            totalGold = Convert.ToInt32(result["newGold"]);
-                            UpdateTotalGoldText();
-                            GameManager.Instance.Gold = totalGold; // GameManager의 골드 업데이트
-                        }
+                            var result = JsonUtility.FromJson<Dictionary<string, object>>(json);
+                            if (result != null && result.ContainsKey("newGold"))
+                            {
+                                totalGold = Convert.ToInt32(result["newGold"]);
+                                UpdateTotalGoldText();
+                                GameManager.Instance.Gold = totalGold; // GameManager의 골드 업데이트
+                            }
 
-                        Debug.Log("Item successfully purchased.");
-                        GameManager.Instance.LoadUserData(); // 유저 데이터 다시 로드
-                        SaveUserGameInfo(); // 데이터베이스에 저장
+                            Debug.Log("Item successfully purchased.");
+                            GameManager.Instance.LoadUserData(); // 유저 데이터 다시 로드
+                            SaveUserGameInfo(); // 데이터베이스에 저장
+
+                            // 새로고침
+                            LoadMarketItems();
+                            StartCoroutine(RefreshUserInventory()); // 사용자 인벤토리 UI 업데이트
+                        }
+                        else
+                        {
+                            Debug.LogError("Failed to parse task.Result.Data.");
+                        }
                     }
                     else
                     {
@@ -387,10 +400,8 @@ public class InventoryManager : MonoBehaviour
             });
     }
 
-
     void UpdateTotalGoldText()
     {
         totalGoldText.text = $"Gold: {totalGold}";
-        Debug.Log($"Total gold updated: {totalGold}");
     }
 }

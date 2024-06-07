@@ -27,7 +27,7 @@ public class AuthManager : MonoBehaviour
     void Login()
     {
         string email = emailInput.text;
-        string password = emailInput.text;
+        string password = passwordInput.text;
 
         auth.SignInWithEmailAndPasswordAsync(email, password).ContinueWithOnMainThread(task => {
             if (task.IsCanceled)
@@ -49,9 +49,7 @@ public class AuthManager : MonoBehaviour
                 Debug.LogFormat("User signed in successfully: {0} ({1})", user.DisplayName, user.UserId);
                 feedbackText.text = "Login successful!";
                 
-                // 유저 데이터 로드
-                GameManager.Instance.LoadUserData();
-                Debug.Log("Called GameManager.Instance.LoadUserData()");
+                GameManager.Instance.InitializeFirebase(); // Firebase 초기화
 
                 SceneManager.LoadScene("MainMenuScene");
             }
@@ -66,7 +64,7 @@ public class AuthManager : MonoBehaviour
     void Register()
     {
         string email = emailInput.text;
-        string password = emailInput.text;
+        string password = passwordInput.text;
 
         auth.CreateUserWithEmailAndPasswordAsync(email, password).ContinueWithOnMainThread(task => {
             if (task.IsCanceled)
@@ -87,11 +85,6 @@ public class AuthManager : MonoBehaviour
             {
                 Debug.LogFormat("Firebase user created successfully: {0} ({1})", newUser.DisplayName, newUser.UserId);
                 feedbackText.text = "Registration successful!";
-                
-                // 유저 데이터 로드
-                GameManager.Instance.LoadUserData();
-                Debug.Log("Called GameManager.Instance.LoadUserData()");
-
                 SceneManager.LoadScene("MainMenuScene");
             }
             else

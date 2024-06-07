@@ -22,7 +22,6 @@ public class GameManager : MonoBehaviour
         {
             Instance = this;
             DontDestroyOnLoad(gameObject);
-            InitializeFirebase();
             Debug.Log("GameManager Awake: Initialized.");
         }
         else
@@ -31,7 +30,7 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    private void InitializeFirebase()
+    public void InitializeFirebase()
     {
         Debug.Log("Initializing Firebase...");
         auth = FirebaseAuth.DefaultInstance;
@@ -61,7 +60,6 @@ public class GameManager : MonoBehaviour
 
     public void LoadUserData()
     {
-        Debug.LogError("Current User: " + CurrentUser);
         if (CurrentUser == null)
         {
             Debug.LogError("CurrentUser is null");
@@ -71,10 +69,8 @@ public class GameManager : MonoBehaviour
         var userDocRef = db.Collection("users").Document(CurrentUser.UserId);
         userDocRef.GetSnapshotAsync().ContinueWithOnMainThread(task =>
         {
-            Debug.LogError("Thread in");
             if (task.IsCompleted && task.Result.Exists)
             {
-                Debug.LogError("task.IsCompleted");
                 var userData = task.Result;
                 Gold = userData.GetValue<int>("gold");
                 LoadUserInventory();
@@ -126,16 +122,35 @@ public class GameManager : MonoBehaviour
         if (CurrentUser == null) return;
 
         var inventoryRef = db.Collection("users").Document(CurrentUser.UserId).Collection("inventory");
-        foreach (var item in Inventory)
+
+        // 기존 인벤토리를 초기화
+        inventoryRef.GetSnapshotAsync().ContinueWithOnMainThread(task =>
         {
-            var itemData = new Dictionary<string, object>
+            if (task.IsCompleted)
             {
-                { "itemName", item.itemName },
-                { "attack", item.attack },
-                { "speed", item.speed },
-                { "defense", item.defense }
-            };
-            inventoryRef.AddAsync(itemData);
-        }
+                var snapshot = task.Result;
+                foreach (var document in snapshot.Documents)
+                {
+                    inventoryRef.Document(document.Id).DeleteAsync();
+                }
+
+                // 새로운 인벤토리 저장
+                foreach (var item in Inventory)
+                {
+                    var itemData = new Dictionary<string, object>
+                    {
+                        { "itemName", item.itemName },
+                        { "attack", item.attack },
+                        { "speed", item.speed },
+                        { "defense", item.defense }
+                    };
+                    inventoryRef.AddAsync(itemData);
+                }
+            }
+            else
+            {
+                Debug.LogError("Failed to clear inventory: " + task.Exception);
+            }
+        });
     }
 }
